@@ -184,13 +184,24 @@ func (Discuss) mustEmbedUnimplementedDiscussServer() {
 }
 
 // AddTag implements pdiscuss.DiscussServer
-func (Discuss) AddTag(ctx context.Context, tag *pdiscuss.Tag) (*pdiscuss.Ok, error) {
-	panic("unimplemented")
+func (d Discuss) AddTag(ctx context.Context, tag *pdiscuss.Tag) (*pdiscuss.Ok, error) {
+	stmt, err := d.DB.Prepare(`INSERT INTO DISCUSS.TAGS(tag_name) VALUES (@tag)`)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(sql.Named("tag", tag.Tag))
+	if err != nil {
+		log.Fatal(err)
+	}
+	return &pdiscuss.Ok{}, err
 
 }
 
-func (d Discuss) ReadTag(ctx context.Context, in *pdiscuss.ReadTagRequest) (*pdiscuss.Tag, error) {
-	tag := &pdiscuss.Tag{}
+func (d Discuss) ReadTag(ctx context.Context, in *pdiscuss.Id) (*pdiscuss.Tag, error) {
+	tag := &pdiscuss.Tag{
+		Tag: "",
+	}
 	stmt, err := d.DB.Prepare(`SELECT tag_name from DISCUSS.TAGS WHERE id == @id`)
 	if err != nil {
 		log.Fatal(err)
@@ -204,6 +215,47 @@ func (d Discuss) ReadTag(ctx context.Context, in *pdiscuss.ReadTagRequest) (*pdi
 	return tag, err
 }
 
+func (d Discuss) Vote(ctx context.Context, in *pdiscuss.VoteRequest) (*emptypb.Empty, error) {
+
+	username, err := d.WathiqClient.Validate(context.Background(), &pwathiq.ValidateRequest{Token: in.Token})
+	if err != nil {
+		log.Fatal(err)
+	}
+	stmt, err := d.Prepare(`SELECT sjl.id FROM SIJL.USERS sjl WHERE sjl.username = @username`)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var sijlId int32
+	err = stmt.QueryRow(sql.Named("username", username)).Scan(&sijlId)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	stmt, err = d.Prepare(`MERGE INTO DISCUSS.VOTES AS target
+USING (
+    SELECT @id AS sijl_id, @argument AS argument_id
+) AS source
+ON (target.sijl_id = source.sijl_id AND target.argument_id = source.argument_id)
+
+WHEN MATCHED THEN
+    DELETE
+
+WHEN NOT MATCHED THEN
+    INSERT (sijl_id, argument_id)
+    VALUES (@id, @argument);
+`)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(sql.Named("id", sijlId), sql.Named("argument", in.ID))
+	if err != nil {
+		log.Fatal(err)
+	}
+	return &emptypb.Empty{}, err
+}
+
 func addresponse(in *pdiscuss.NewArgumentRequest, d *Discuss) int32 {
 	stmt, err := d.DB.Prepare(`
 INSERT INTO DISCUSS.ARGUMENTS (in_response, argument, argument_start, argument_end, sijl_id)
@@ -214,11 +266,20 @@ VALUES (@in_response, @argument, @start, @end, @id)
 	}
 	defer stmt.Close()
 
-	sijlID, err := d.WathiqClient.Validate(context.Background(), &pwathiq.ValidateRequest{Token: in.Token})
+	username, err := d.WathiqClient.Validate(context.Background(), &pwathiq.ValidateRequest{Token: in.Token})
 	if err != nil {
 		log.Fatal(err)
 	}
-	sijlId, _ := strconv.Atoi(sijlID.Id)
+	stmt, err = d.Prepare(`SELECT sjl.id FROM SIJL.USERS sjl WHERE sjl.username = @username`)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var sijlId int32
+	err = stmt.QueryRow(sql.Named("username", username)).Scan(&sijlId)
+	if err != nil {
+		log.Fatal(err)
+	}
 	row, err := stmt.Exec(sql.Named("in_response", in.ResponseTo), sql.Named("argument", in.Argument),
 		sql.Named("start", in.ArgumentStart), sql.Named("end", in.ArgumentEnd), sql.Named("id", sijlId))
 	if err != nil {

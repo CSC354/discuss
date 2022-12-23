@@ -30,7 +30,8 @@ type DiscussClient interface {
 	ReadLatestArguments(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Responses, error)
 	ReadLatestResponses(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Responses, error)
 	AddTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*Ok, error)
-	ReadTag(ctx context.Context, in *ReadTagRequest, opts ...grpc.CallOption) (*Tag, error)
+	ReadTag(ctx context.Context, in *Id, opts ...grpc.CallOption) (*Tag, error)
+	Vote(ctx context.Context, in *VoteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type discussClient struct {
@@ -104,9 +105,18 @@ func (c *discussClient) AddTag(ctx context.Context, in *Tag, opts ...grpc.CallOp
 	return out, nil
 }
 
-func (c *discussClient) ReadTag(ctx context.Context, in *ReadTagRequest, opts ...grpc.CallOption) (*Tag, error) {
+func (c *discussClient) ReadTag(ctx context.Context, in *Id, opts ...grpc.CallOption) (*Tag, error) {
 	out := new(Tag)
 	err := c.cc.Invoke(ctx, "/discuss.Discuss/ReadTag", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *discussClient) Vote(ctx context.Context, in *VoteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/discuss.Discuss/Vote", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +134,8 @@ type DiscussServer interface {
 	ReadLatestArguments(context.Context, *emptypb.Empty) (*Responses, error)
 	ReadLatestResponses(context.Context, *emptypb.Empty) (*Responses, error)
 	AddTag(context.Context, *Tag) (*Ok, error)
-	ReadTag(context.Context, *ReadTagRequest) (*Tag, error)
+	ReadTag(context.Context, *Id) (*Tag, error)
+	Vote(context.Context, *VoteRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedDiscussServer()
 }
 
@@ -153,8 +164,11 @@ func (UnimplementedDiscussServer) ReadLatestResponses(context.Context, *emptypb.
 func (UnimplementedDiscussServer) AddTag(context.Context, *Tag) (*Ok, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddTag not implemented")
 }
-func (UnimplementedDiscussServer) ReadTag(context.Context, *ReadTagRequest) (*Tag, error) {
+func (UnimplementedDiscussServer) ReadTag(context.Context, *Id) (*Tag, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReadTag not implemented")
+}
+func (UnimplementedDiscussServer) Vote(context.Context, *VoteRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Vote not implemented")
 }
 func (UnimplementedDiscussServer) mustEmbedUnimplementedDiscussServer() {}
 
@@ -296,7 +310,7 @@ func _Discuss_AddTag_Handler(srv interface{}, ctx context.Context, dec func(inte
 }
 
 func _Discuss_ReadTag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ReadTagRequest)
+	in := new(Id)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -308,7 +322,25 @@ func _Discuss_ReadTag_Handler(srv interface{}, ctx context.Context, dec func(int
 		FullMethod: "/discuss.Discuss/ReadTag",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DiscussServer).ReadTag(ctx, req.(*ReadTagRequest))
+		return srv.(DiscussServer).ReadTag(ctx, req.(*Id))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Discuss_Vote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DiscussServer).Vote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/discuss.Discuss/Vote",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DiscussServer).Vote(ctx, req.(*VoteRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -351,6 +383,10 @@ var Discuss_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReadTag",
 			Handler:    _Discuss_ReadTag_Handler,
+		},
+		{
+			MethodName: "Vote",
+			Handler:    _Discuss_Vote_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
