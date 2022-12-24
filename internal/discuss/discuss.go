@@ -202,12 +202,12 @@ func (d Discuss) ReadTag(ctx context.Context, in *pdiscuss.Id) (*pdiscuss.Tag, e
 	tag := &pdiscuss.Tag{
 		Tag: "",
 	}
-	stmt, err := d.DB.Prepare(`SELECT tag_name from DISCUSS.TAGS WHERE id == @id`)
+	stmt, err := d.DB.Prepare(`SELECT tag_name from DISCUSS.TAGS WHERE id = @td`)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = stmt.QueryRow(sql.Named("id", in.ID)).Scan(&tag.Tag)
+	err = stmt.QueryRow(sql.Named("td", in.ID)).Scan(&tag.Tag)
 	if err != nil {
 		log.Fatal(err)
 	}
