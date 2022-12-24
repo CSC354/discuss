@@ -313,7 +313,7 @@ VALUES (@in_response, @argument, @start, @end, @id)
 
 func addargument(in *pdiscuss.NewArgumentRequest, d *Discuss) int32 {
 	stmt, err := d.DB.Prepare(`
-INSERT INTO DISCUSS.ARGUMENTS (sijl_id, argument) VALUES (@id, @text)
+INSERT INTO DISCUSS.ARGUMENTS (sijl_id, argument, title) VALUES (@id, @text, @title)
 `)
 	if err != nil {
 		log.Fatal(err)
@@ -325,7 +325,7 @@ INSERT INTO DISCUSS.ARGUMENTS (sijl_id, argument) VALUES (@id, @text)
 		log.Fatal(err)
 	}
 	sijlId, _ := strconv.Atoi(sijlID.Id)
-	row, err := stmt.Exec(sql.Named("id", sijlId), sql.Named("text", in.Argument))
+	row, err := stmt.Exec(sql.Named("id", sijlId), sql.Named("text", in.Argument), sql.Named("title", in.Title))
 	if err != nil {
 		log.Fatal(err)
 	}
