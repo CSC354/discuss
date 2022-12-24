@@ -256,6 +256,25 @@ WHEN NOT MATCHED THEN
 	return &emptypb.Empty{}, err
 }
 
+func (d Discuss) GetTags(ctx context.Context, in *emptypb.Empty) (*pdiscuss.Responses, error) {
+	res := &pdiscuss.Responses{}
+	row, err := d.DB.Query(`SELECT id FROM DISCUSS.TAGS`)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer row.Close()
+	for row.Next() {
+		var tagID int32
+		err = row.Scan(tagID)
+		if err != nil {
+			log.Fatal(err)
+		}
+		res.ReponsesIDs = append(res.ReponsesIDs, tagID)
+	}
+	res.Error = int32(perrors.Errors_Ok)
+	return res, err
+}
+
 func addresponse(in *pdiscuss.NewArgumentRequest, d *Discuss) int32 {
 	stmt, err := d.DB.Prepare(`
 INSERT INTO DISCUSS.ARGUMENTS (in_response, argument, argument_start, argument_end, sijl_id)

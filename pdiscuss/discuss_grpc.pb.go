@@ -32,6 +32,7 @@ type DiscussClient interface {
 	AddTag(ctx context.Context, in *Tag, opts ...grpc.CallOption) (*Ok, error)
 	ReadTag(ctx context.Context, in *Id, opts ...grpc.CallOption) (*Tag, error)
 	Vote(ctx context.Context, in *VoteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Responses, error)
 }
 
 type discussClient struct {
@@ -123,6 +124,15 @@ func (c *discussClient) Vote(ctx context.Context, in *VoteRequest, opts ...grpc.
 	return out, nil
 }
 
+func (c *discussClient) GetTags(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Responses, error) {
+	out := new(Responses)
+	err := c.cc.Invoke(ctx, "/discuss.Discuss/GetTags", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DiscussServer is the server API for Discuss service.
 // All implementations must embed UnimplementedDiscussServer
 // for forward compatibility
@@ -136,6 +146,7 @@ type DiscussServer interface {
 	AddTag(context.Context, *Tag) (*Ok, error)
 	ReadTag(context.Context, *Id) (*Tag, error)
 	Vote(context.Context, *VoteRequest) (*emptypb.Empty, error)
+	GetTags(context.Context, *emptypb.Empty) (*Responses, error)
 	mustEmbedUnimplementedDiscussServer()
 }
 
@@ -169,6 +180,9 @@ func (UnimplementedDiscussServer) ReadTag(context.Context, *Id) (*Tag, error) {
 }
 func (UnimplementedDiscussServer) Vote(context.Context, *VoteRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Vote not implemented")
+}
+func (UnimplementedDiscussServer) GetTags(context.Context, *emptypb.Empty) (*Responses, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTags not implemented")
 }
 func (UnimplementedDiscussServer) mustEmbedUnimplementedDiscussServer() {}
 
@@ -345,6 +359,24 @@ func _Discuss_Vote_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Discuss_GetTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DiscussServer).GetTags(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/discuss.Discuss/GetTags",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DiscussServer).GetTags(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Discuss_ServiceDesc is the grpc.ServiceDesc for Discuss service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -387,6 +419,10 @@ var Discuss_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Vote",
 			Handler:    _Discuss_Vote_Handler,
+		},
+		{
+			MethodName: "GetTags",
+			Handler:    _Discuss_GetTags_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
