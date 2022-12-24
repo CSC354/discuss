@@ -73,7 +73,7 @@ func (d Discuss) ReadArgument(ctx context.Context, in *pdiscuss.ReadArgumentRequ
 	defer rows.Close()
 	for rows.Next() {
 		var tag int32
-		err = rows.Scan(tag)
+		err = rows.Scan(&tag)
 		arg.TagIDs = append(arg.TagIDs, tag)
 		if err != nil {
 			log.Fatal(err)
@@ -84,7 +84,7 @@ func (d Discuss) ReadArgument(ctx context.Context, in *pdiscuss.ReadArgumentRequ
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = stmt.QueryRow(sql.Named("id", in.ID)).Scan(arg.Votes)
+	err = stmt.QueryRow(sql.Named("id", in.ID)).Scan(&arg.Votes)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -265,7 +265,7 @@ func (d Discuss) GetTags(ctx context.Context, in *emptypb.Empty) (*pdiscuss.Resp
 	defer row.Close()
 	for row.Next() {
 		var tagID int32
-		err = row.Scan(tagID)
+		err = row.Scan(&tagID)
 		if err != nil {
 			log.Fatal(err)
 		}
