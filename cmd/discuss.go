@@ -6,6 +6,6 @@ import (
 )
 
 func main() {
-	serv.StartDiscussServer()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	serv.StartDiscussServer()
 }
