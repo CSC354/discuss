@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log"
-	"strconv"
+	"time"
 
 	"github.com/CSC354/discuss/pdiscuss"
 	"github.com/CSC354/discuss/perrors"
@@ -56,14 +56,16 @@ func (d Discuss) NewArgument(ctx context.Context, in *pdiscuss.NewArgumentReques
 // ReadArgument implements pdiscuss.DiscussServer
 func (d Discuss) ReadArgument(ctx context.Context, in *pdiscuss.ReadArgumentRequest) (*pdiscuss.ReadArgumentResponse, error) {
 	arg := pdiscuss.ReadArgumentResponse{}
-	stmt, err := d.DB.Prepare(`SELECT sijl_id, argument from DISCUSS.ARGUMENTS arg WHERE id == @id`)
+	var date time.Time
+	stmt, err := d.DB.Prepare(`SELECT sijl_id, argument, date from DISCUSS.ARGUMENTS arg WHERE id == @id`)
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = stmt.QueryRow(sql.Named("id", in.ID)).Scan(&arg.AuthorID, &arg.Text)
+	err = stmt.QueryRow(sql.Named("id", in.ID)).Scan(&arg.AuthorID, &arg.Text, &date)
 	if err != nil {
 		log.Fatal(err)
 	}
+	arg.Date = date.Unix()
 	stmt.Close()
 	stmt, err = d.Prepare(`SELECT tag_id FROM DISCUSS.ARGUMENTS_TAGS tags WHERE @argument = tags.argument_id`)
 	if err != nil {
@@ -276,20 +278,12 @@ func (d Discuss) GetTags(ctx context.Context, in *emptypb.Empty) (*pdiscuss.Resp
 }
 
 func addresponse(in *pdiscuss.NewArgumentRequest, d *Discuss) int32 {
-	stmt, err := d.DB.Prepare(`
-INSERT INTO DISCUSS.ARGUMENTS (in_response, argument, argument_start, argument_end, sijl_id)
-VALUES (@in_response, @argument, @start, @end, @id)
-`)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer stmt.Close()
 
 	username, err := d.WathiqClient.Validate(context.Background(), &pwathiq.ValidateRequest{Token: in.Token})
 	if err != nil {
 		log.Fatal(err)
 	}
-	stmt, err = d.Prepare(`SELECT sjl.id FROM SIJL.USERS sjl WHERE sjl.username = @username`)
+	stmt, err := d.Prepare(`SELECT sjl.id FROM SIJL.USERS sjl WHERE sjl.username = @username`)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -299,12 +293,19 @@ VALUES (@in_response, @argument, @start, @end, @id)
 	if err != nil {
 		log.Fatal(err)
 	}
-	row, err := stmt.Exec(sql.Named("in_response", in.ResponseTo), sql.Named("argument", in.Argument),
-		sql.Named("start", in.ArgumentStart), sql.Named("end", in.ArgumentEnd), sql.Named("id", sijlId))
+
+	stmt, err = d.DB.Prepare(`
+INSERT INTO DISCUSS.ARGUMENTS (in_response, argument, argument_start, argument_end, sijl_id)
+VALUES (@in_response, @argument, @start, @end, @id);
+select scope_identity()
+`)
 	if err != nil {
 		log.Fatal(err)
 	}
-	id, err := row.LastInsertId()
+
+	var id int
+	err = stmt.QueryRow(sql.Named("in_response", in.ResponseTo), sql.Named("argument", in.Argument),
+		sql.Named("start", in.ArgumentStart), sql.Named("end", in.ArgumentEnd), sql.Named("id", sijlId)).Scan(&id)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -312,26 +313,36 @@ VALUES (@in_response, @argument, @start, @end, @id)
 }
 
 func addargument(in *pdiscuss.NewArgumentRequest, d *Discuss) int32 {
-	stmt, err := d.DB.Prepare(`
-INSERT INTO DISCUSS.ARGUMENTS (sijl_id, argument, title) VALUES (@id, @text, @title)
-`)
+
+	username, err := d.WathiqClient.Validate(context.Background(), &pwathiq.ValidateRequest{Token: in.Token})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	stmt, err := d.Prepare(`SELECT sjl.id FROM SIJL.USERS sjl WHERE sjl.username = @username`)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var sijlId int32
+	err = stmt.QueryRow(sql.Named("username", username.Id)).Scan(&sijlId)
+	if err != nil {
+		log.Fatal(err)
+	}
+	stmt.Close()
+
+	stmt, err = d.DB.Prepare(`
+INSERT INTO DISCUSS.ARGUMENTS (sijl_id, argument, title) VALUES (@id, @text, @title);
+select scope_identity()`)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmt.Close()
 
-	sijlID, err := d.WathiqClient.Validate(context.Background(), &pwathiq.ValidateRequest{Token: in.Token})
+	var id int
+	err = stmt.QueryRow(sql.Named("id", sijlId), sql.Named("text", in.Argument), sql.Named("title", in.Title)).Scan(&id)
 	if err != nil {
-		log.Fatal(err)
-	}
-	sijlId, _ := strconv.Atoi(sijlID.Id)
-	row, err := stmt.Exec(sql.Named("id", sijlId), sql.Named("text", in.Argument), sql.Named("title", in.Title))
-	if err != nil {
-		log.Fatal(err)
-	}
-	id, err := row.LastInsertId()
-	if err != nil {
-		log.Fatal(err)
+		log.Fatal(sijlId, err)
 	}
 	return int32(id)
 }
